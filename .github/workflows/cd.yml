@@ -1,0 +1,333 @@
+name: Continuous Deployment
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to deploy'
+        required: true
+        default: 'latest'
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+
+env:
+  NODE_VERSION: '20'
+  PYTHON_VERSION: '3.12'
+  RUST_VERSION: 'stable'
+
+jobs:
+  # Version and changelog generation
+  prepare-release:
+    name: Prepare Release
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      changelog: ${{ steps.changelog.outputs.changelog }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get version
+        id: version
+        run: |
+          if [[ "${{ github.event_name }}" == "push" ]]; then
+            VERSION=${GITHUB_REF#refs/tags/}
+          else
+            VERSION=${{ github.event.inputs.version }}
+          fi
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+
+      - name: Generate changelog
+        id: changelog
+        uses: mikepenz/release-changelog-builder-action@v4
+        with:
+          configuration: '.github/changelog-config.json'
+          toTag: ${{ steps.version.outputs.version }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Build for multiple platforms
+  build-release:
+    name: Build Release
+    runs-on: ${{ matrix.os }}
+    needs: prepare-release
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            platform: linux
+            arch: x64
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            platform: windows
+            arch: x64
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            platform: macos
+            arch: x64
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            platform: macos
+            arch: arm64
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+          targets: ${{ matrix.target }}
+
+      - name: Install system dependencies (Ubuntu)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build application
+        run: npm run tauri build -- --target ${{ matrix.target }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+          TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+
+      - name: Create release archive
+        shell: bash
+        run: |
+          VERSION="${{ needs.prepare-release.outputs.version }}"
+          PLATFORM="${{ matrix.platform }}"
+          ARCH="${{ matrix.arch }}"
+          
+          cd src-tauri/target/${{ matrix.target }}/release/bundle
+          
+          if [[ "$PLATFORM" == "windows" ]]; then
+            if command -v 7z &> /dev/null; then
+              7z a -tzip "../../../../../aura-${VERSION}-${PLATFORM}-${ARCH}.zip" msi/*
+            else
+              powershell Compress-Archive -Path "msi/*" -DestinationPath "../../../../../aura-${VERSION}-${PLATFORM}-${ARCH}.zip"
+            fi
+          elif [[ "$PLATFORM" == "macos" ]]; then
+            tar -czf "../../../../../aura-${VERSION}-${PLATFORM}-${ARCH}.tar.gz" dmg/*
+          else
+            tar -czf "../../../../../aura-${VERSION}-${PLATFORM}-${ARCH}.tar.gz" deb/* appimage/* || tar -czf "../../../../../aura-${VERSION}-${PLATFORM}-${ARCH}.tar.gz" deb/* || tar -czf "../../../../../aura-${VERSION}-${PLATFORM}-${ARCH}.tar.gz" appimage/*
+          fi
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: aura-${{ matrix.platform }}-${{ matrix.arch }}
+          path: aura-${{ needs.prepare-release.outputs.version }}-${{ matrix.platform }}-${{ matrix.arch }}.*
+          retention-days: 30
+
+  # Security scanning for release
+  security-scan-release:
+    name: Security Scan Release
+    runs-on: ubuntu-latest
+    needs: build-release
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Scan release artifacts
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'json'
+          output: 'release-scan-results.json'
+
+      - name: Upload scan results
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-scan-results
+          path: release-scan-results.json
+
+  # Create GitHub release
+  create-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [prepare-release, build-release, security-scan-release]
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ needs.prepare-release.outputs.version }}
+          name: Aura Desktop Assistant ${{ needs.prepare-release.outputs.version }}
+          body: ${{ needs.prepare-release.outputs.changelog }}
+          draft: false
+          prerelease: ${{ contains(needs.prepare-release.outputs.version, '-') }}
+          files: |
+            aura-*/aura-*
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Deploy to staging
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: [prepare-release, build-release]
+    if: github.event.inputs.environment == 'staging' || (github.event_name == 'push' && contains(needs.prepare-release.outputs.version, '-'))
+    environment:
+      name: staging
+      url: https://staging.aura-assistant.com
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Deploy to staging
+        run: |
+          echo "Deploying to staging environment..."
+          # Add your staging deployment logic here
+          # This could include:
+          # - Uploading to staging servers
+          # - Updating auto-updater endpoints
+          # - Running smoke tests
+          # - Notifying team channels
+
+      - name: Run staging smoke tests
+        run: |
+          echo "Running staging smoke tests..."
+          # Add smoke test commands here
+
+      - name: Notify deployment
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          channel: '#deployments'
+          text: 'Aura ${{ needs.prepare-release.outputs.version }} deployed to staging'
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  # Deploy to production
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [prepare-release, build-release, create-release]
+    if: github.event.inputs.environment == 'production' || (github.event_name == 'push' && !contains(needs.prepare-release.outputs.version, '-'))
+    environment:
+      name: production
+      url: https://aura-assistant.com
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Deploy to production
+        run: |
+          echo "Deploying to production environment..."
+          # Add your production deployment logic here
+          # This could include:
+          # - Uploading to CDN/distribution servers
+          # - Updating auto-updater endpoints
+          # - Triggering app store submissions
+          # - Running comprehensive tests
+
+      - name: Update auto-updater
+        run: |
+          echo "Updating auto-updater endpoints..."
+          # Update Tauri updater endpoints with new version
+
+      - name: Run production health checks
+        run: |
+          echo "Running production health checks..."
+          # Add health check commands here
+
+      - name: Notify successful deployment
+        uses: 8398a7/action-slack@v3
+        with:
+          status: success
+          channel: '#releases'
+          text: '🚀 Aura ${{ needs.prepare-release.outputs.version }} successfully deployed to production!'
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  # Post-deployment monitoring
+  post-deployment-monitoring:
+    name: Post-Deployment Monitoring
+    runs-on: ubuntu-latest
+    needs: [deploy-production]
+    if: always() && needs.deploy-production.result == 'success'
+    steps:
+      - name: Setup monitoring
+        run: |
+          echo "Setting up post-deployment monitoring..."
+          # Add monitoring setup here
+          # This could include:
+          # - Setting up alerts
+          # - Configuring dashboards
+          # - Starting error tracking
+
+      - name: Wait and monitor
+        run: |
+          echo "Monitoring deployment for 10 minutes..."
+          sleep 600
+          # Add monitoring checks here
+
+      - name: Report monitoring results
+        run: |
+          echo "Deployment monitoring completed successfully"
+          # Add monitoring report logic here
+
+  # Rollback capability
+  rollback:
+    name: Rollback Deployment
+    runs-on: ubuntu-latest
+    if: failure() && (needs.deploy-staging.result == 'failure' || needs.deploy-production.result == 'failure')
+    needs: [deploy-staging, deploy-production]
+    steps:
+      - name: Rollback deployment
+        run: |
+          echo "Rolling back deployment..."
+          # Add rollback logic here
+          # This could include:
+          # - Reverting to previous version
+          # - Updating auto-updater endpoints
+          # - Notifying team of rollback
+
+      - name: Notify rollback
+        uses: 8398a7/action-slack@v3
+        with:
+          status: failure
+          channel: '#alerts'
+          text: '⚠️ Aura deployment rolled back due to failure'
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

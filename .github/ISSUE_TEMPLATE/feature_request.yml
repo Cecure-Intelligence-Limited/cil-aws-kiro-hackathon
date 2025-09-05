@@ -1,0 +1,164 @@
+name: ✨ Feature Request
+description: Suggest an idea for Aura
+title: "[Feature]: "
+labels: ["enhancement", "triage"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to suggest a new feature! Please provide as much detail as possible.
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Prerequisites
+      description: Please confirm the following before submitting a feature request
+      options:
+        - label: I have searched existing issues to ensure this feature hasn't been requested
+          required: true
+        - label: I have read the documentation and confirmed this feature doesn't exist
+          required: true
+        - label: This feature aligns with Aura's goals as a voice-first desktop assistant
+          required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem Statement
+      description: Is your feature request related to a problem? Please describe.
+      placeholder: A clear and concise description of what the problem is. Ex. I'm always frustrated when [...]
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution
+      description: Describe the solution you'd like
+      placeholder: A clear and concise description of what you want to happen.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternative Solutions
+      description: Describe alternatives you've considered
+      placeholder: A clear and concise description of any alternative solutions or features you've considered.
+    validations:
+      required: false
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: Feature Category
+      description: What category does this feature belong to?
+      options:
+        - Voice Recognition/STT
+        - Text-to-Speech/TTS
+        - Intent Parsing/NLP
+        - File Operations
+        - Spreadsheet Analysis
+        - Document AI/PDF Processing
+        - User Interface/UX
+        - Security/Privacy
+        - Performance/Optimization
+        - Integration/API
+        - Accessibility
+        - Configuration/Settings
+        - Other (specify in additional context)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority Level
+      description: How important is this feature to you?
+      options:
+        - Low - Nice to have
+        - Medium - Would improve my workflow
+        - High - Important for my use case
+        - Critical - Blocking my adoption of Aura
+    validations:
+      required: true
+
+  - type: textarea
+    id: use_cases
+    attributes:
+      label: Use Cases
+      description: Describe specific use cases for this feature
+      placeholder: |
+        1. As a [user type], I want to [action] so that [benefit]
+        2. When [scenario], this feature would help by [benefit]
+        3. This would be useful for [specific workflow/task]
+    validations:
+      required: true
+
+  - type: textarea
+    id: mockups
+    attributes:
+      label: Mockups/Examples
+      description: If applicable, add mockups, screenshots, or examples
+      placeholder: Drag and drop images here or describe the UI/interaction
+
+  - type: textarea
+    id: technical_considerations
+    attributes:
+      label: Technical Considerations
+      description: Any technical aspects to consider?
+      placeholder: |
+        - Performance implications
+        - Security considerations
+        - Privacy concerns
+        - Platform compatibility
+        - Dependencies required
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: platforms
+    attributes:
+      label: Target Platforms
+      description: Which platforms should this feature support?
+      options:
+        - label: Windows
+        - label: Linux
+        - label: Both platforms
+
+  - type: dropdown
+    id: complexity
+    attributes:
+      label: Estimated Complexity
+      description: How complex do you think this feature would be to implement?
+      options:
+        - Low - Simple addition or modification
+        - Medium - Moderate development effort
+        - High - Significant development effort
+        - Very High - Major architectural changes required
+        - Unknown - Not sure about complexity
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Add any other context, links, or references about the feature request here
+      placeholder: |
+        - Links to similar features in other applications
+        - Research or articles supporting this feature
+        - Any other relevant information
+
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: Contribution
+      description: Would you be willing to contribute to implementing this feature?
+      options:
+        - label: I would be willing to submit a PR to implement this feature
+        - label: I would be willing to help design/spec this feature
+        - label: I would be willing to help test this feature
+        - label: I can provide domain expertise for this feature

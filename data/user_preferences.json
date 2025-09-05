@@ -1,0 +1,17 @@
+{
+  "voice": {
+    "stt_provider": "vosk",
+    "tts_provider": "system",
+    "language": "en-US"
+  },
+  "privacy": {
+    "local_processing": true,
+    "cloud_features": false,
+    "data_retention_days": 30
+  },
+  "ui": {
+    "theme": "dark",
+    "animations": true,
+    "hotkey": "Ctrl+'"
+  }
+}

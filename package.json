@@ -1,0 +1,77 @@
+{
+  "name": "aura-desktop-assistant",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "main": "electron-main.cjs",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build",
+    "electron": "electron .",
+    "electron:dev": "concurrently \"npm run dev\" \"wait-on http://localhost:5173 && electron .\"",
+    "electron:build": "npm run build && electron-builder",
+    "desktop:demo": "npm run electron:dev",
+    "build:mcp": "node scripts/build-mcp-server.js",
+    "mcp:server": "tsx src/services/mcpStandalone.ts",
+    "mcp:test": "node scripts/test-mcp.js",
+    "mcp:test-python": "python scripts/test-python-mcp.py",
+    "test:basic": "python scripts/test-basic.py",
+    "test:batch": "scripts\\test-batch-mcp.bat",
+    "test:simple": "scripts\\test-simple.bat",
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "test:run": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:create-data": "python scripts/create-test-data.py",
+    "test:all": "python scripts/run-all-tests.py"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^1.5.3",
+    "@tauri-apps/plugin-global-shortcut": "^2.3.0",
+    "@xstate/react": "^4.1.0",
+    "node-fetch": "^3.3.2",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "xstate": "^5.8.0"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^1.5.10",
+    "@types/node": "^20.11.0",
+    "@types/react": "^18.2.66",
+    "@types/react-dom": "^18.2.22",
+    "@vitejs/plugin-react": "^4.2.1",
+    "@vitest/ui": "^1.2.0",
+    "autoprefixer": "^10.4.18",
+    "concurrently": "^9.2.1",
+    "electron": "^37.4.0",
+    "electron-builder": "^26.0.12",
+    "jsdom": "^23.2.0",
+    "postcss": "^8.4.35",
+    "tailwindcss": "^3.4.1",
+    "tsx": "^4.7.0",
+    "typescript": "^5.2.2",
+    "vite": "^5.1.6",
+    "vitest": "^1.2.0",
+    "wait-on": "^8.0.4"
+  },
+  "build": {
+    "appId": "com.aura.desktop-assistant",
+    "productName": "Aura Desktop Assistant",
+    "directories": {
+      "output": "dist-electron"
+    },
+    "files": [
+      "dist/**/*",
+      "electron-main.cjs",
+      "package.json"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "public/icon.ico"
+    }
+  }
+}

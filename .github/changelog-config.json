@@ -1,0 +1,90 @@
+{
+  "categories": [
+    {
+      "title": "## 🚀 Features",
+      "labels": ["enhancement", "feature"]
+    },
+    {
+      "title": "## 🐛 Bug Fixes",
+      "labels": ["bug", "bugfix"]
+    },
+    {
+      "title": "## 🔒 Security",
+      "labels": ["security"]
+    },
+    {
+      "title": "## ⚡ Performance",
+      "labels": ["performance"]
+    },
+    {
+      "title": "## 📚 Documentation",
+      "labels": ["documentation", "docs"]
+    },
+    {
+      "title": "## 🔧 Maintenance",
+      "labels": ["maintenance", "refactor", "chore"]
+    },
+    {
+      "title": "## 📦 Dependencies",
+      "labels": ["dependencies"]
+    },
+    {
+      "title": "## 🧪 Testing",
+      "labels": ["testing", "tests"]
+    },
+    {
+      "title": "## 🚀 CI/CD",
+      "labels": ["ci", "cd", "github-actions"]
+    }
+  ],
+  "ignore_labels": [
+    "ignore-for-release",
+    "duplicate",
+    "invalid",
+    "wontfix"
+  ],
+  "sort": "ASC",
+  "template": "${{CHANGELOG}}",
+  "pr_template": "- ${{TITLE}} (#${{NUMBER}})",
+  "empty_template": "- No changes",
+  "label_extractor": [
+    {
+      "pattern": "\\[(.*)\\]",
+      "target": "$1"
+    }
+  ],
+  "transformers": [
+    {
+      "pattern": "^(feat|feature)(\\(.+\\))?!?:",
+      "target": "🚀 $1"
+    },
+    {
+      "pattern": "^(fix|bugfix)(\\(.+\\))?!?:",
+      "target": "🐛 $1"
+    },
+    {
+      "pattern": "^(docs|doc)(\\(.+\\))?!?:",
+      "target": "📚 $1"
+    },
+    {
+      "pattern": "^(perf|performance)(\\(.+\\))?!?:",
+      "target": "⚡ $1"
+    },
+    {
+      "pattern": "^(security|sec)(\\(.+\\))?!?:",
+      "target": "🔒 $1"
+    },
+    {
+      "pattern": "^(chore|maintenance)(\\(.+\\))?!?:",
+      "target": "🔧 $1"
+    },
+    {
+      "pattern": "^(test|tests)(\\(.+\\))?!?:",
+      "target": "🧪 $1"
+    },
+    {
+      "pattern": "^(ci|cd)(\\(.+\\))?!?:",
+      "target": "🚀 $1"
+    }
+  ]
+}

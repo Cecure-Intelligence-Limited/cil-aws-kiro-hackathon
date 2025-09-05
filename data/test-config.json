@@ -1,0 +1,32 @@
+{
+  "test_scenarios": [
+    {
+      "name": "File Creation Test",
+      "command": "Create a meeting notes document titled 'Test Meeting' and write 'This is a test document created by Aura'",
+      "expected_file": "documents/Test Meeting.txt",
+      "expected_content": "This is a test document created by Aura"
+    },
+    {
+      "name": "Spreadsheet Analysis Test",
+      "command": "Analyze my sample budget spreadsheet and calculate the total income",
+      "expected_result": "Total income calculation from sample-budget.csv"
+    },
+    {
+      "name": "Document Summary Test",
+      "command": "Summarize the technical overview document in three bullet points",
+      "expected_result": "Three coherent bullet points about Aura"
+    }
+  ],
+  "performance_benchmarks": {
+    "voice_recognition_ms": 1000,
+    "intent_parsing_ms": 500,
+    "file_operation_ms": 200,
+    "api_response_ms": 100
+  },
+  "quality_metrics": {
+    "accuracy_threshold": 0.95,
+    "response_time_p95": 2000,
+    "ui_fps_target": 60,
+    "memory_usage_mb_max": 512
+  }
+}

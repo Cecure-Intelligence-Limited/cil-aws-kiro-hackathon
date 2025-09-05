@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "aura-desktop-assistant": {
+      "command": "scripts/simple-mcp.bat",
+      "args": [],
+      "cwd": "./",
+      "env": {
+        "AURA_API_URL": "http://localhost:8000"
+      },
+      "disabled": false,
+      "autoApprove": [
+        "create_file"
+      ]
+    }
+  }
+}

@@ -1,0 +1,13 @@
+# Minimal requirements for Aura demo
+fastapi
+uvicorn[standard]
+pydantic
+python-multipart
+httpx
+requests
+pandas
+openpyxl
+PyPDF2
+structlog
+python-dotenv
+colorama

@@ -1,0 +1,264 @@
+{
+  "name": "aura-desktop-assistant",
+  "version": "1.0.0",
+  "description": "Desktop assistant tools for file operations, spreadsheet analysis, and document processing",
+  "tools": [
+    {
+      "name": "create_file",
+      "description": "Create a new file with optional content in a specified location",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "Name of the file to create (including extension)",
+            "minLength": 1,
+            "maxLength": 255,
+            "pattern": "^[^<>:\"|?*\\x00-\\x1f]+$"
+          },
+          "path": {
+            "type": "string",
+            "description": "Optional directory path where file should be created (relative to safe directories)",
+            "pattern": "^[^<>:\"|?*\\x00-\\x1f]*$"
+          },
+          "content": {
+            "type": "string",
+            "description": "Optional initial content for the file",
+            "maxLength": 1048576
+          }
+        },
+        "required": ["title"],
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "title": "meeting-notes.txt",
+          "content": "Meeting Notes - January 15, 2025\n\nAttendees:\n- Alice\n- Bob"
+        },
+        {
+          "title": "config.json",
+          "path": "./settings",
+          "content": "{\"theme\": \"dark\", \"language\": \"en\"}"
+        }
+      ]
+    },
+    {
+      "name": "open_item",
+      "description": "Open a file, application, or folder using the system's default handler",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Search query for the item to open (file name, app name, or path)",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "type": {
+            "type": "string",
+            "enum": ["file", "application", "folder", "auto"],
+            "description": "Type of item to open - 'auto' will attempt to determine the type automatically",
+            "default": "auto"
+          }
+        },
+        "required": ["query"],
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "query": "budget.xlsx",
+          "type": "file"
+        },
+        {
+          "query": "Visual Studio Code",
+          "type": "application"
+        },
+        {
+          "query": "Documents",
+          "type": "folder"
+        }
+      ]
+    },
+    {
+      "name": "analyze_sheet",
+      "description": "Perform mathematical operations on spreadsheet data with intelligent column matching",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Path to the spreadsheet file (CSV, XLSX, XLS, or ODS)",
+            "pattern": "\\.(csv|xlsx|xls|ods)$"
+          },
+          "op": {
+            "type": "string",
+            "enum": ["sum", "avg", "count", "total"],
+            "description": "Mathematical operation to perform on the data"
+          },
+          "column": {
+            "type": "string",
+            "description": "Column name or identifier to analyze (supports fuzzy matching)",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        },
+        "required": ["path", "op", "column"],
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "path": "employees.csv",
+          "op": "sum",
+          "column": "salary"
+        },
+        {
+          "path": "sales_data.xlsx",
+          "op": "avg",
+          "column": "revenue"
+        },
+        {
+          "path": "inventory.csv",
+          "op": "count",
+          "column": "items"
+        }
+      ]
+    },
+    {
+      "name": "summarize_doc",
+      "description": "Extract text from PDF documents and generate intelligent summaries using AI",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Path to the PDF document to summarize",
+            "pattern": "\\.pdf$"
+          },
+          "length": {
+            "type": "string",
+            "enum": ["short", "bullets", "tweet"],
+            "description": "Desired summary format: 'short' for paragraph, 'bullets' for bullet points, 'tweet' for 280 chars",
+            "default": "short"
+          }
+        },
+        "required": ["path"],
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "path": "quarterly-report.pdf",
+          "length": "bullets"
+        },
+        {
+          "path": "research-paper.pdf",
+          "length": "short"
+        },
+        {
+          "path": "meeting-minutes.pdf",
+          "length": "tweet"
+        }
+      ]
+    }
+  ],
+  "routing": {
+    "description": "Intelligent routing rules for determining which tool to use based on user input",
+    "rules": [
+      {
+        "tool": "analyze_sheet",
+        "triggers": ["sum", "total", "average", "avg", "count", "calculate", "add up", "spreadsheet", "csv", "excel"],
+        "patterns": [
+          ".*\\b(sum|total|average|avg|count|calculate)\\b.*\\b(column|data|spreadsheet|csv|excel)\\b.*",
+          ".*\\b(add up|total up)\\b.*",
+          ".*\\b(average|mean)\\b.*\\b(of|in)\\b.*",
+          ".*\\.(csv|xlsx|xls|ods)\\b.*\\b(sum|total|average|count)\\b.*"
+        ],
+        "priority": 90
+      },
+      {
+        "tool": "summarize_doc",
+        "triggers": ["summarize", "summary", "explain", "find in pdf", "pdf", "document", "bullet points", "key points"],
+        "patterns": [
+          ".*\\b(summarize|summary)\\b.*\\b(pdf|document)\\b.*",
+          ".*\\b(explain|describe)\\b.*\\b(pdf|document)\\b.*",
+          ".*\\b(find|search)\\b.*\\b(in|pdf)\\b.*",
+          ".*\\.(pdf)\\b.*\\b(summarize|summary|explain|bullet)\\b.*",
+          ".*\\b(bullet points|key points|main points)\\b.*"
+        ],
+        "priority": 85
+      },
+      {
+        "tool": "open_item",
+        "triggers": ["open", "launch", "start", "run", "execute", "show"],
+        "patterns": [
+          ".*\\b(open|launch|start|run|execute)\\b.*",
+          ".*\\b(show|display)\\b.*\\b(file|folder|application|app)\\b.*",
+          ".*\\b(open|launch)\\b.*\\.(txt|pdf|xlsx|csv|docx|jpg|png)\\b.*"
+        ],
+        "priority": 80
+      },
+      {
+        "tool": "create_file",
+        "triggers": ["create", "make", "write", "new file", "generate"],
+        "patterns": [
+          ".*\\b(create|make|write|generate)\\b.*\\b(file|document)\\b.*",
+          ".*\\b(new)\\b.*\\b(file|document|text)\\b.*",
+          ".*\\b(write|save)\\b.*\\b(to|in|as)\\b.*\\.(txt|md|json|csv)\\b.*"
+        ],
+        "priority": 75
+      }
+    ],
+    "fallback": {
+      "tool": "create_file",
+      "description": "Default to file creation if no other tool matches clearly"
+    }
+  },
+  "response_format": {
+    "success": {
+      "type": "object",
+      "properties": {
+        "success": {"type": "boolean", "const": true},
+        "tool": {"type": "string"},
+        "message": {"type": "string"},
+        "data": {"type": "object"},
+        "execution_time": {"type": "number"},
+        "metadata": {
+          "type": "object",
+          "properties": {
+            "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+            "matched_patterns": {"type": "array", "items": {"type": "string"}},
+            "alternative_tools": {"type": "array", "items": {"type": "string"}}
+          }
+        }
+      },
+      "required": ["success", "tool", "message"]
+    },
+    "error": {
+      "type": "object",
+      "properties": {
+        "success": {"type": "boolean", "const": false},
+        "tool": {"type": "string"},
+        "error": {"type": "string"},
+        "error_code": {"type": "string"},
+        "suggestions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": {"type": "string", "enum": ["rephrase", "clarify", "example", "alternative"]},
+              "message": {"type": "string"},
+              "example": {"type": "string"}
+            }
+          }
+        },
+        "metadata": {
+          "type": "object",
+          "properties": {
+            "attempted_tool": {"type": "string"},
+            "error_details": {"type": "object"}
+          }
+        }
+      },
+      "required": ["success", "error"]
+    }
+  }
+}

@@ -1,0 +1,21 @@
+SOFTWARE DEVELOPMENT AGREEMENT
+
+This Agreement is entered into between TechCorp Inc. and Client Solutions LLC.
+
+SCOPE OF WORK:
+Development of custom web application with the following features:
+- User authentication system
+- Dashboard with analytics
+- API integration
+- Mobile responsive design
+
+CONTRACT VALUE: $50,000
+START DATE: 2024-02-01
+END DATE: 2024-05-01
+
+PAYMENT TERMS:
+- 30% upfront payment
+- 40% at milestone completion
+- 30% upon final delivery
+
+Both parties agree to the terms and conditions outlined in this agreement.

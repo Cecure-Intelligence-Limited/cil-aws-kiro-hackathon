@@ -1,0 +1,18 @@
+INVOICE #INV-2024-001
+Date: 2024-01-15
+
+Bill To:
+Acme Corporation
+123 Business St
+New York, NY 10001
+
+Description          Qty    Rate      Amount
+Web Development      40     $150.00   $6,000.00
+UI/UX Design         20     $120.00   $2,400.00
+Project Management   10     $100.00   $1,000.00
+
+Subtotal:                           $9,400.00
+Tax (8.5%):                         $799.00
+Total:                              $10,199.00
+
+Payment Terms: Net 30

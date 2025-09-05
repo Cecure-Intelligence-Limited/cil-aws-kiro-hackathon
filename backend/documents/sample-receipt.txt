@@ -1,0 +1,17 @@
+RECEIPT
+Store: Tech Supplies Inc
+Date: 2024-01-15 14:30
+
+Items:
+Laptop Stand         $45.99
+USB Cable            $12.99
+Mouse Pad            $8.99
+
+Subtotal:            $67.97
+Tax:                 $5.44
+Total:               $73.41
+
+Payment: Credit Card
+Card: ****1234
+
+Thank you for your purchase!
