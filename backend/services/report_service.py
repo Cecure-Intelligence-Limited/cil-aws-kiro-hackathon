@@ -9,11 +9,22 @@ from typing import Dict, Any, List, Optional
 import structlog
 import json
 from datetime import datetime, timedelta
-import matplotlib.pyplot as plt
-import seaborn as sns
-from jinja2 import Template
 import io
 import base64
+
+# Optional imports for enhanced features
+try:
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    MATPLOTLIB_AVAILABLE = True
+except ImportError:
+    MATPLOTLIB_AVAILABLE = False
+
+try:
+    from jinja2 import Template
+    JINJA2_AVAILABLE = True
+except ImportError:
+    JINJA2_AVAILABLE = False
 
 logger = structlog.get_logger(__name__)
 
@@ -296,6 +307,9 @@ class ReportService:
         charts = []
         
         try:
+            import matplotlib.pyplot as plt
+            import seaborn as sns
+            
             plt.style.use('seaborn-v0_8')
             
             if report_type == "sales" and "top_products" in processed_data:
@@ -343,6 +357,33 @@ class ReportService:
                     "title": "Expenses by Account",
                     "type": "pie",
                     "data": chart_data
+                })
+                
+        except ImportError:
+            logger.warning("Matplotlib not available, generating text-based charts")
+            # Generate simple text-based charts as fallback
+            if report_type == "sales" and "top_products" in processed_data:
+                chart_text = "Top Products by Sales:\n"
+                for product, value in processed_data["top_products"].items():
+                    chart_text += f"  {product}: ${value:,.2f}\n"
+                
+                charts.append({
+                    "title": "Top Products by Sales",
+                    "type": "text",
+                    "data": chart_text
+                })
+            
+            if report_type == "financial" and "expenses_by_account" in processed_data:
+                chart_text = "Expenses by Account:\n"
+                total = sum(processed_data["expenses_by_account"].values())
+                for account, amount in processed_data["expenses_by_account"].items():
+                    percentage = (amount / total) * 100 if total > 0 else 0
+                    chart_text += f"  {account}: ${amount:,.2f} ({percentage:.1f}%)\n"
+                
+                charts.append({
+                    "title": "Expenses by Account",
+                    "type": "text",
+                    "data": chart_text
                 })
                 
         except Exception as e:
@@ -409,60 +450,65 @@ class ReportService:
                             charts: List[Dict[str, str]], 
                             summary: str, 
                             report_type: str) -> str:
-        """Generate HTML report content"""
+        """Generate HTML report content using Python string formatting"""
         
-        html_template = """
+        # Generate charts HTML
+        charts_html = ""
+        for chart in charts:
+            charts_html += f"""
+            <div class="chart">
+                <h3>{chart['title']}</h3>
+                <img src="data:image/png;base64,{chart['data']}" alt="{chart['title']}">
+            </div>
+            """
+        
+        # Generate data sections HTML
+        data_html = ""
+        for key, value in processed_data.items():
+            formatted_key = key.replace('_', ' ').title()
+            data_html += f"""
+                <h3>{formatted_key}</h3>
+                <p>{str(value)}</p>
+            """
+        
+        # Complete HTML template
+        html_content = f"""
         <!DOCTYPE html>
         <html>
         <head>
-            <title>{{ report_type|title }} Report</title>
+            <title>{report_type.title()} Report</title>
             <style>
-                body { font-family: Arial, sans-serif; margin: 40px; }
-                .header { text-align: center; margin-bottom: 30px; }
-                .summary { background: #f5f5f5; padding: 20px; margin: 20px 0; }
-                .chart { margin: 20px 0; text-align: center; }
-                .data-table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-                .data-table th, .data-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-                .data-table th { background-color: #f2f2f2; }
+                body {{ font-family: Arial, sans-serif; margin: 40px; }}
+                .header {{ text-align: center; margin-bottom: 30px; }}
+                .summary {{ background: #f5f5f5; padding: 20px; margin: 20px 0; }}
+                .chart {{ margin: 20px 0; text-align: center; }}
+                .data-table {{ width: 100%; border-collapse: collapse; margin: 20px 0; }}
+                .data-table th, .data-table td {{ border: 1px solid #ddd; padding: 8px; text-align: left; }}
+                .data-table th {{ background-color: #f2f2f2; }}
             </style>
         </head>
         <body>
             <div class="header">
-                <h1>{{ report_type|title }} Report</h1>
-                <p>Generated on {{ generated_at }}</p>
+                <h1>{report_type.title()} Report</h1>
+                <p>Generated on {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}</p>
             </div>
             
             <div class="summary">
                 <h2>Executive Summary</h2>
-                <pre>{{ summary }}</pre>
+                <pre>{summary}</pre>
             </div>
             
-            {% for chart in charts %}
-            <div class="chart">
-                <h3>{{ chart.title }}</h3>
-                <img src="data:image/png;base64,{{ chart.data }}" alt="{{ chart.title }}">
-            </div>
-            {% endfor %}
+            {charts_html}
             
             <div class="data-section">
                 <h2>Detailed Data</h2>
-                {% for key, value in processed_data.items() %}
-                <h3>{{ key|replace('_', ' ')|title }}</h3>
-                <p>{{ value }}</p>
-                {% endfor %}
+                {data_html}
             </div>
         </body>
         </html>
         """
         
-        template = Template(html_template)
-        return template.render(
-            report_type=report_type,
-            summary=summary,
-            charts=charts,
-            processed_data=processed_data,
-            generated_at=datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        )
+        return html_content
     
     async def _save_report(self, report_content: Dict[str, Any], report_config: Dict[str, Any]) -> str:
         """Save generated report"""

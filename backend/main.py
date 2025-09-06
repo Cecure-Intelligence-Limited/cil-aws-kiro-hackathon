@@ -6,7 +6,7 @@ Provides REST API endpoints for file operations, spreadsheet analysis, and docum
 import os
 import logging
 from contextlib import asynccontextmanager
-from typing import Optional, List, List
+from typing import Optional, List
 
 import structlog
 from fastapi import FastAPI, HTTPException, status
