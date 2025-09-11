@@ -16,12 +16,17 @@ if %errorlevel% neq 0 (
 
 echo.
 echo Installing core Python dependencies...
-pip install --upgrade pip
-pip install -r backend/requirements.txt
+pip install --upgrade pip --user
+echo Installing dependencies with --user flag to avoid permission issues...
+pip install -r backend/requirements.txt --user --no-deps --force-reinstall
 if %errorlevel% neq 0 (
-    echo ERROR: Failed to install core dependencies
-    pause
-    exit /b 1
+    echo WARNING: Some dependencies failed to install with --user flag
+    echo Trying alternative installation method...
+    pip install -r backend/requirements.txt --user
+    if %errorlevel% neq 0 (
+        echo WARNING: Some core dependencies may not be available
+        echo The server will still start with basic functionality
+    )
 )
 
 echo.

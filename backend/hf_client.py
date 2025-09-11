@@ -323,3 +323,25 @@ async def answer_question(question: str, context: str) -> Dict[str, Any]:
     
     async with HuggingFaceClient() as client:
         return await client.answer_question(question, context)
+
+
+# Standalone function for backward compatibility
+async def summarize_text(text: str, length_type: str = "short") -> str:
+    """
+    Standalone function to summarize text using Hugging Face API
+    
+    Args:
+        text: Text to summarize
+        length_type: Type of summary (short, bullets, tweet)
+        
+    Returns:
+        Summarized text
+    """
+    try:
+        async with HuggingFaceClient() as client:
+            return await client.summarize_text(text)
+    except Exception as e:
+        logger.error("Standalone summarization failed", error=str(e))
+        # Return a simple fallback summary
+        sentences = text.split('.')[:3]  # First 3 sentences
+        return '. '.join(sentences).strip() + '.' if sentences else "Summary not available."

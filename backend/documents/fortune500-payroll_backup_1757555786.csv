@@ -1,0 +1,11 @@
+Employee_ID,Employee_Name,Department,Position,Base_Salary,Overtime_Hours,Overtime_Rate,Overtime_Pay,Bonus,Stock_Options,Benefits,Gross_Pay,Tax_Withholding,Net_Pay,Performance_Rating,Years_Experience 
+CEO001,Sarah Chen,Executive,Chief Executive Officer,450000,0,0,0,150000,500000,45000,1145000,458000,687000,Outstanding,15 
+CTO002,Michael Rodriguez,Technology,Chief Technology Officer,320000,5,200,1000,80000,300000,32000,733000,293200,439800,Excellent,12 
+VP003,Jennifer Kim,Sales,VP of Sales,280000,10,180,1800,120000,200000,28000,629800,251920,377880,Outstanding,10 
+DIR004,David Thompson,Engineering,Director of Engineering,220000,15,160,2400,60000,150000,22000,454400,181760,272640,Excellent,8 
+MGR005,Lisa Wang,Marketing,Marketing Manager,180000,8,140,1120,40000,100000,18000,339120,135648,203472,Good,6 
+SR006,James Wilson,Engineering,Senior Software Engineer,160000,20,130,2600,35000,80000,16000,293600,117440,176160,Excellent,5 
+SR007,Maria Garcia,Data Science,Senior Data Scientist,170000,12,135,1620,45000,90000,17000,323620,129448,194172,Outstanding,4 
+AN008,Robert Lee,Finance,Financial Analyst,120000,6,110,660,25000,50000,12000,207660,83064,124596,Good,3 
+DEV009,Emily Brown,Engineering,Full Stack Developer,140000,18,125,2250,30000,70000,14000,256250,102500,153750,Excellent,4 
+SPE010,Alex Johnson,Product,Product Specialist,130000,10,120,1200,28000,60000,13000,232200,92880,139320,Good,3 

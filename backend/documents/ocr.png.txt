@@ -1,0 +1,18 @@
+Sample Invoice 
+ 
+Invoice Number: INV-2024-001 
+Date: December 15, 2024 
+ 
+Bill To: 
+Tech Solutions Inc. 
+123 Business Ave 
+New York, NY 10001 
+ 
+Description          Qty    Price    Total 
+Software License      1    $1,200   $1,200 
+Support Services      1      $500     $500 
+Training Sessions     2      $300     $600 
+ 
+Subtotal:                           $2,300 
+Tax (8.25%):                        $190 
+Total:                             $2,490 

@@ -5,31 +5,26 @@ import react from '@vitejs/plugin-react';
 export default defineConfig(async () => ({
   plugins: [react()],
 
-  // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
-  //
-  // 1. prevent vite from obscuring rust errors
+  // Vite options optimized for Electron development
   clearScreen: false,
-  // 2. Use default Vite port for Electron compatibility
   server: {
     port: 5173,
     strictPort: false,
+    host: 'localhost',
     watch: {
-      // 3. tell vite to ignore watching `src-tauri`
+      // Ignore Tauri directory (legacy)
       ignored: ["**/src-tauri/**"],
     },
   },
   
   // Environment variables
-  envPrefix: ['VITE_', 'TAURI_'],
+  envPrefix: ['VITE_', 'ELECTRON_'],
   
-  // Build configuration
+  // Build configuration optimized for Electron
   build: {
-    // Tauri supports es2021
-    target: process.env.TAURI_PLATFORM == 'windows' ? 'chrome105' : 'safari13',
-    // don't minify for debug builds
-    minify: !process.env.TAURI_DEBUG ? 'esbuild' : false,
-    // produce sourcemaps for debug builds
-    sourcemap: !!process.env.TAURI_DEBUG,
+    target: 'chrome120', // Modern Electron uses recent Chrome
+    minify: 'esbuild',
+    sourcemap: true,
     
     // Rollup options
     rollupOptions: {
@@ -37,7 +32,6 @@ export default defineConfig(async () => ({
         manualChunks: {
           vendor: ['react', 'react-dom'],
           xstate: ['xstate', '@xstate/react'],
-          tauri: ['@tauri-apps/api'],
         },
       },
     },

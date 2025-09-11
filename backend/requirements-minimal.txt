@@ -1,13 +1,8 @@
-# Minimal requirements for Aura demo
-fastapi
-uvicorn[standard]
-pydantic
-python-multipart
-httpx
-requests
-pandas
-openpyxl
-PyPDF2
-structlog
-python-dotenv
-colorama
+# Minimal requirements for basic functionality
+fastapi>=0.100.0
+uvicorn[standard]>=0.20.0
+pydantic>=2.0.0
+structlog>=23.0.0
+python-multipart>=0.0.6
+aiofiles>=23.0.0
+requests>=2.30.0

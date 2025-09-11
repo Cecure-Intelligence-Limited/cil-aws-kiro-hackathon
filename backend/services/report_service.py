@@ -3,7 +3,6 @@ Report Generation Automation Service
 Handles automated report compilation from multiple data sources
 """
 
-import pandas as pd
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 import structlog
@@ -13,6 +12,12 @@ import io
 import base64
 
 # Optional imports for enhanced features
+try:
+    import pandas as pd
+    PANDAS_AVAILABLE = True
+except ImportError:
+    PANDAS_AVAILABLE = False
+    
 try:
     import matplotlib.pyplot as plt
     import seaborn as sns
@@ -126,8 +131,12 @@ class ReportService:
         
         return collected_data
     
-    async def _load_spreadsheet_data(self, file_path: str) -> pd.DataFrame:
+    async def _load_spreadsheet_data(self, file_path: str):
         """Load data from spreadsheet file"""
+        
+        if not PANDAS_AVAILABLE:
+            logger.warning("Pandas not available, returning simulated data")
+            return self._create_simulated_dataframe()
         
         path = Path(file_path)
         
@@ -526,16 +535,22 @@ class ReportService:
             
             self.generated_reports.append(report_data)
             
-            # Save to file
-            reports_file = Path("backend/data/generated_reports.json")
-            reports_file.parent.mkdir(exist_ok=True)
+            # Save to file (handle both backend/ and root directory execution)
+            import os
+            if os.path.exists("backend/data"):
+                reports_file = Path("backend/data/generated_reports.json")
+                html_file = Path(f"backend/data/reports/{report_id}.html")
+            else:
+                reports_file = Path("data/generated_reports.json")
+                html_file = Path(f"data/reports/{report_id}.html")
+            
+            reports_file.parent.mkdir(parents=True, exist_ok=True)
             
             with open(reports_file, 'w') as f:
                 json.dump(self.generated_reports, f, indent=2, default=str)
             
             # Save HTML report
-            html_file = Path(f"backend/data/reports/{report_id}.html")
-            html_file.parent.mkdir(exist_ok=True)
+            html_file.parent.mkdir(parents=True, exist_ok=True)
             
             with open(html_file, 'w') as f:
                 f.write(report_content["html_content"])

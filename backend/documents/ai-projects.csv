@@ -1,0 +1,7 @@
+Project_ID,Project_Name,Department,Budget,Spent,Remaining,Status,ROI_Projected,Timeline_Months,Team_Size,Technology_Stack 
+AI001,Customer Sentiment Analysis,Marketing,850000,620000,230000,In Progress,340,8,12,Python-TensorFlow-AWS 
+AI002,Predictive Maintenance System,Operations,1200000,980000,220000,Testing,280,12,15,Python-PyTorch-Azure 
+AI003,Fraud Detection Engine,Security,950000,750000,200000,Deployment,450,6,10,Python-Scikit-GCP 
+AI004,Supply Chain Optimization,Logistics,1500000,1100000,400000,In Progress,520,18,20,Python-Spark-Databricks 
+AI005,Voice Assistant Platform,Customer Service,800000,650000,150000,Beta,380,10,14,Python-NLP-OpenAI 
+AI006,Automated Trading System,Finance,2200000,1800000,400000,Production,680,15,25,Python-Pandas-Kubernetes 

@@ -354,14 +354,57 @@ class SpreadsheetService:
             shutil.copy2(file_path, backup_path)
             logger.info("Created backup", backup_path=str(backup_path))
             
-            # Save updated file IN PLACE (overwrite original)
-            if file_path.suffix.lower() == '.csv':
-                df.to_csv(file_path, index=False)
-            elif file_path.suffix.lower() in ['.xlsx', '.xls']:
-                df.to_excel(file_path, index=False)
-            else:
-                # Fallback to CSV
-                df.to_csv(file_path, index=False)
+            # Save updated file IN PLACE (overwrite original) with retry logic
+            max_retries = 3
+            retry_delay = 0.5
+            
+            for attempt in range(max_retries):
+                try:
+                    # Ensure file is not read-only
+                    import stat
+                    file_path.chmod(stat.S_IWRITE | stat.S_IREAD)
+                    
+                    if file_path.suffix.lower() == '.csv':
+                        df.to_csv(file_path, index=False)
+                    elif file_path.suffix.lower() in ['.xlsx', '.xls']:
+                        df.to_excel(file_path, index=False)
+                    else:
+                        # Fallback to CSV
+                        df.to_csv(file_path, index=False)
+                    
+                    # If we get here, the write was successful
+                    break
+                    
+                except PermissionError as pe:
+                    if attempt < max_retries - 1:
+                        logger.warning(f"Permission error on attempt {attempt + 1}, retrying...", 
+                                     error=str(pe), file_path=str(file_path))
+                        import time
+                        time.sleep(retry_delay)
+                        retry_delay *= 2  # Exponential backoff
+                    else:
+                        # Last attempt failed, try alternative approach
+                        logger.warning("All write attempts failed, trying alternative file name")
+                        
+                        # Create new file with timestamp suffix
+                        import time
+                        timestamp = int(time.time())
+                        alt_path = file_path.parent / f"{file_path.stem}_updated_{timestamp}{file_path.suffix}"
+                        
+                        if file_path.suffix.lower() == '.csv':
+                            df.to_csv(alt_path, index=False)
+                        elif file_path.suffix.lower() in ['.xlsx', '.xls']:
+                            df.to_excel(alt_path, index=False)
+                        else:
+                            df.to_csv(alt_path, index=False)
+                        
+                        logger.info("Created updated file with new name", 
+                                  original=str(file_path), 
+                                  updated=str(alt_path))
+                        
+                        # Update the file_path for return value
+                        file_path = alt_path
+                        break
             
             logger.info("Spreadsheet update completed",
                        path=path,

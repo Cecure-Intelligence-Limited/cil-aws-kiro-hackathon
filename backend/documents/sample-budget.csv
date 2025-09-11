@@ -1,12 +1,6 @@
-Employee_Name,Department,Base_Salary,Bonus,Benefits,Total_Monthly
-John Smith,Engineering,8500,1200,850,10550
-Sarah Johnson,Marketing,7200,800,720,8720
-Mike Davis,Sales,6800,1500,680,8980
-Lisa Chen,Engineering,9200,1000,920,11120
-David Wilson,HR,6500,500,650,7650
-Emma Brown,Finance,7800,900,780,9480
-Alex Garcia,Engineering,8800,1100,880,10780
-Rachel Lee,Marketing,6900,700,690,8290
-Tom Anderson,Sales,7100,1400,710,9210
-Maria Rodriguez,Finance,7500,800,750,9050
-TOTALS,All Departments,76300,9900,7630,93830
+Employee_Name,Department,Base_Salary,Bonus,Benefits,Total_Monthly 
+John Smith,Engineering,14347.000114453125,1200,850,16397.000114453127
+Sarah Johnson,Marketing,12152.753038125,800,720,13672.753038125
+Mike Davis,Sales,11477.600091562497,1500,680,13657.600091562497
+Lisa Chen,Engineering,15528.517770937504,1000,920,17448.517770937506
+David Wilson,HR,10971.235381640627,500,650,12121.235381640627
