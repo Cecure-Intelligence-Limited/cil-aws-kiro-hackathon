@@ -1,0 +1,15 @@
+{
+  "file_versions": {
+    "max_versions_per_file": 50,
+    "max_age_days": 90,
+    "max_storage_mb": 1000
+  },
+  "command_history": {
+    "max_commands": 1000,
+    "max_age_days": 30
+  },
+  "cleanup": {
+    "auto_cleanup_enabled": true,
+    "cleanup_interval_hours": 24
+  }
+}

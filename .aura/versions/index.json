@@ -1,0 +1,19 @@
+{
+  "created": "2025-09-15T22:51:12.476075+00:00",
+  "last_updated": "2025-09-15T22:52:11.178710+00:00",
+  "total_versions": 1,
+  "files": {
+    "7440bb6750b04e65": {
+      "file_path": "test_file.txt",
+      "versions": [
+        {
+          "version_id": "20250915_225211_164557_c20a3bcc",
+          "timestamp": "2025-09-15T22:52:11.164557+00:00",
+          "size": 45,
+          "operation_type": "create"
+        }
+      ],
+      "total_versions": 1
+    }
+  }
+}

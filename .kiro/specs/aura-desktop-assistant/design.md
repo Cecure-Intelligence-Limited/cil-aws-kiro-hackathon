@@ -687,11 +687,15 @@ interface PrivacySettings {
     extractedData: number; // days
     emailCache: number; // days
     calendarCache: number; // days
+    fileVersions: number; // days or version count
+    commandHistory: number; // days or command count
   };
   security: {
     encryptLocalData: boolean;
     requireConfirmation: boolean;
     auditLogging: boolean;
+    encryptVersions: boolean;
+    secureVersionDeletion: boolean;
   };
   automation: {
     emailAccess: boolean;
@@ -707,7 +711,167 @@ interface PrivacySettings {
     calendarSources: string[]; // authorized calendar sources
     externalIntegrations: string[]; // CRM, databases, etc.
   };
+  versioning: {
+    enableAutoVersioning: boolean;
+    maxVersionsPerFile: number;
+    maxStorageSize: number; // MB
+    enableDifferentialVersioning: boolean;
+    autoCleanupEnabled: boolean;
+  };
 }
+```
+
+## State Management and Versioning Architecture
+
+### Versioning System Design
+
+```mermaid
+flowchart TD
+    A[User Action] --> B[Pre-Operation Hook]
+    B --> C[Create File Version]
+    C --> D[Execute Operation]
+    D --> E[Log Command History]
+    E --> F[Update State]
+    
+    C --> G[.aura/versions/]
+    E --> H[.aura/history/]
+    F --> I[.aura/state/]
+    
+    G --> J[File Backup]
+    G --> K[Metadata Storage]
+    G --> L[Differential Storage]
+    
+    H --> M[Command Log]
+    H --> N[Execution Context]
+    H --> O[Result Tracking]
+    
+    I --> P[Application State]
+    I --> Q[Session Context]
+    I --> R[Recovery Points]
+```
+
+### .aura Directory Structure
+
+```
+.aura/
+├── versions/                    # File versioning system
+│   ├── {file_path_hash}/       # Hashed file path directory
+│   │   ├── {timestamp_1}/      # Version timestamp
+│   │   │   ├── content         # File content
+│   │   │   ├── metadata.json   # Version metadata
+│   │   │   └── diff.patch      # Differential changes
+│   │   └── {timestamp_2}/
+│   └── index.json              # Version index and lookup
+├── history/                    # Command and execution history
+│   ├── commands.jsonl          # Command execution log
+│   ├── sessions/               # Session-based history
+│   │   └── {session_id}.json   # Session command history
+│   └── index.json              # History index and search
+├── state/                      # Application state management
+│   ├── checkpoints/            # State checkpoints
+│   ├── recovery/               # Recovery points
+│   └── current.json            # Current application state
+├── config/                     # Versioning configuration
+│   ├── retention.json          # Retention policies
+│   ├── storage.json            # Storage settings
+│   └── security.json           # Security configuration
+└── logs/                       # System logs
+    ├── versioning.log          # Versioning operations
+    ├── cleanup.log             # Cleanup operations
+    └── errors.log              # Error tracking
+```
+
+### Versioning Data Models
+
+```typescript
+interface FileVersion {
+  id: string;
+  filePath: string;
+  timestamp: Date;
+  size: number;
+  checksum: string;
+  changeDescription: string;
+  operationType: 'create' | 'modify' | 'delete';
+  commandId: string;
+  metadata: {
+    originalSize: number;
+    compressionRatio: number;
+    isDifferential: boolean;
+    parentVersion?: string;
+  };
+}
+
+interface CommandHistoryEntry {
+  id: string;
+  timestamp: Date;
+  sessionId: string;
+  userInput: string;
+  parsedIntent: ParsedIntent;
+  executionDuration: number;
+  success: boolean;
+  errorMessage?: string;
+  affectedFiles: string[];
+  beforeState: Record<string, any>;
+  afterState: Record<string, any>;
+  rollbackData?: RollbackData;
+}
+
+interface RollbackData {
+  operationType: string;
+  affectedFiles: FileRollbackInfo[];
+  stateChanges: StateChange[];
+  dependencies: string[]; // Other commands that depend on this
+}
+
+interface FileRollbackInfo {
+  filePath: string;
+  beforeVersion: string;
+  afterVersion: string;
+  operation: 'created' | 'modified' | 'deleted';
+}
+
+interface StateCheckpoint {
+  id: string;
+  timestamp: Date;
+  description: string;
+  applicationState: Record<string, any>;
+  fileStates: Record<string, string>; // file path -> version id
+  commandCount: number;
+  isAutomatic: boolean;
+}
+```
+
+### Rollback System Architecture
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant UI
+    participant RollbackService
+    participant VersionManager
+    participant FileSystem
+    participant StateManager
+    
+    User->>UI: Request rollback to timestamp
+    UI->>RollbackService: initiate_rollback(timestamp)
+    RollbackService->>VersionManager: analyze_impact(timestamp)
+    VersionManager->>RollbackService: affected_files_and_operations
+    RollbackService->>UI: show_rollback_preview(changes)
+    UI->>User: Display preview and confirmation
+    User->>UI: Confirm rollback
+    UI->>RollbackService: execute_rollback()
+    
+    loop For each affected file
+        RollbackService->>VersionManager: get_version_at_timestamp(file, timestamp)
+        VersionManager->>FileSystem: restore_file_version(file, version)
+    end
+    
+    RollbackService->>StateManager: restore_application_state(timestamp)
+    StateManager->>RollbackService: state_restored
+    RollbackService->>VersionManager: create_rollback_checkpoint()
+    RollbackService->>UI: rollback_complete(summary)
+    UI->>User: Show rollback results
+```
 ```
 
 ## Error Handling

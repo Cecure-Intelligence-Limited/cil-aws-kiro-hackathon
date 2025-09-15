@@ -24,6 +24,8 @@ from services.email_service import EmailService
 from services.calendar_service import CalendarService
 from services.report_service import ReportService
 from services.workflow_service import WorkflowService
+from services.versioning_service import VersioningService, OperationType
+from services.command_history_service import CommandHistoryService
 from utils.logging_config import setup_logging
 
 # Setup structured logging
@@ -39,12 +41,23 @@ email_service = EmailService()
 calendar_service = CalendarService()
 report_service = ReportService()
 workflow_service = WorkflowService()
+versioning_service = VersioningService()
+command_history_service = CommandHistoryService(versioning_service)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan manager"""
     logger.info("Starting Aura Desktop Assistant API", version="1.0.0")
+
+    # Initialize .aura folder structure on startup
+    try:
+        await versioning_service.initialize_aura_folder()
+        logger.info("Aura folder structure initialized successfully")
+    except Exception as e:
+        logger.error(
+            "Failed to initialize .aura folder structure", error=str(e))
+
     yield
     logger.info("Shutting down Aura Desktop Assistant API")
 
@@ -72,16 +85,20 @@ app.add_middleware(
 
 # Request/Response Models
 class CreateFileRequest(BaseModel):
-    title: str = Field(..., min_length=1, max_length=255, description="Name of the file to create")
-    path: Optional[str] = Field(None, description="Optional directory path where file should be created")
-    content: Optional[str] = Field("", description="Optional initial content for the file")
+    title: str = Field(..., min_length=1, max_length=255,
+                       description="Name of the file to create")
+    path: Optional[str] = Field(
+        None, description="Optional directory path where file should be created")
+    content: Optional[str] = Field(
+        "", description="Optional initial content for the file")
 
     @validator('title')
     def validate_filename(cls, v):
         invalid_chars = '<>:"|?*'
         # Remove control characters check that was causing issues
         if any(char in v for char in invalid_chars):
-            raise ValueError(f"Filename contains invalid characters: {invalid_chars}")
+            raise ValueError(
+                f"Filename contains invalid characters: {invalid_chars}")
         return v
 
     @validator('path')
@@ -92,28 +109,32 @@ class CreateFileRequest(BaseModel):
 
 
 class OpenItemRequest(BaseModel):
-    query: str = Field(..., min_length=1, max_length=500, description="Search query for the item to open")
-    type: Optional[str] = Field("auto", pattern="^(file|application|folder|auto)$", 
-                               description="Type of item to open")
+    query: str = Field(..., min_length=1, max_length=500,
+                       description="Search query for the item to open")
+    type: Optional[str] = Field("auto", pattern="^(file|application|folder|auto)$",
+                                description="Type of item to open")
 
 
 class AnalyzeSheetRequest(BaseModel):
     path: str = Field(..., description="Path to the spreadsheet file")
-    op: str = Field(..., pattern="^(sum|avg|count|total)$", description="Operation to perform")
-    column: str = Field(..., min_length=1, max_length=100, description="Column name to analyze")
+    op: str = Field(..., pattern="^(sum|avg|count|total)$",
+                    description="Operation to perform")
+    column: str = Field(..., min_length=1, max_length=100,
+                        description="Column name to analyze")
 
     @validator('path')
     def validate_spreadsheet_path(cls, v):
         valid_extensions = ('.csv', '.xlsx', '.xls', '.ods')
         if not any(v.lower().endswith(ext) for ext in valid_extensions):
-            raise ValueError(f"File must have one of these extensions: {valid_extensions}")
+            raise ValueError(
+                f"File must have one of these extensions: {valid_extensions}")
         return v
 
 
 class SummarizeDocRequest(BaseModel):
     path: str = Field(..., description="Path to the PDF document")
-    length: Optional[str] = Field("short", pattern="^(short|bullets|tweet)$", 
-                                 description="Summary format and length")
+    length: Optional[str] = Field("short", pattern="^(short|bullets|tweet)$",
+                                  description="Summary format and length")
 
     @validator('path')
     def validate_pdf_path(cls, v):
@@ -148,57 +169,132 @@ class DocumentSummaryResponse(BaseModel):
 
 class UpdateSheetRequest(BaseModel):
     path: str = Field(..., description="Path to the spreadsheet file")
-    operation: str = Field(..., pattern="^(salary_increase|bonus_update|add_column)$", description="Update operation to perform")
-    column: Optional[str] = Field(None, description="Column name for operations")
+    operation: str = Field(..., pattern="^(salary_increase|bonus_update|add_column)$",
+                           description="Update operation to perform")
+    column: Optional[str] = Field(
+        None, description="Column name for operations")
     value: Optional[str] = Field(None, description="Value for operations")
-    percentage: Optional[float] = Field(None, description="Percentage for increases")
+    percentage: Optional[float] = Field(
+        None, description="Percentage for increases")
 
     @validator('path')
     def validate_spreadsheet_path(cls, v):
         valid_extensions = ('.csv', '.xlsx', '.xls', '.ods')
         if not any(v.lower().endswith(ext) for ext in valid_extensions):
-            raise ValueError(f"File must have one of these extensions: {valid_extensions}")
+            raise ValueError(
+                f"File must have one of these extensions: {valid_extensions}")
         return v
 
 
 class ExtractDataRequest(BaseModel):
-    file_path: str = Field(..., description="Path to document for data extraction")
-    document_type: Optional[str] = Field("auto", pattern="^(auto|invoice|contract|form|receipt)$", description="Type of document")
-    destination_file: Optional[str] = Field(None, description="Optional destination spreadsheet for data transfer")
+    file_path: str = Field(...,
+                           description="Path to document for data extraction")
+    document_type: Optional[str] = Field(
+        "auto", pattern="^(auto|invoice|contract|form|receipt)$", description="Type of document")
+    destination_file: Optional[str] = Field(
+        None, description="Optional destination spreadsheet for data transfer")
 
 
 class EmailRuleRequest(BaseModel):
     name: str = Field(..., description="Name of the email rule")
-    condition: str = Field(..., description="Rule condition (e.g., 'subject contains invoice')")
-    action: str = Field(..., pattern="^(move|label|forward|respond)$", description="Action to take")
-    target: str = Field(..., description="Target folder, label, recipient, or template")
+    condition: str = Field(...,
+                           description="Rule condition (e.g., 'subject contains invoice')")
+    action: str = Field(..., pattern="^(move|label|forward|respond)$",
+                        description="Action to take")
+    target: str = Field(...,
+                        description="Target folder, label, recipient, or template")
 
 
 class ScheduleMeetingRequest(BaseModel):
-    participants: List[str] = Field(..., description="List of participant emails")
+    participants: List[str] = Field(...,
+                                    description="List of participant emails")
     duration: int = Field(60, description="Meeting duration in minutes")
-    timeframe: Optional[str] = Field("next_week", description="Time range to search for slots")
+    timeframe: Optional[str] = Field(
+        "next_week", description="Time range to search for slots")
     title: Optional[str] = Field("Meeting", description="Meeting title")
     agenda: Optional[str] = Field("", description="Meeting agenda")
 
 
 class GenerateReportRequest(BaseModel):
-    report_type: str = Field(..., pattern="^(sales|financial|performance|custom)$", description="Type of report to generate")
-    data_sources: List[str] = Field(..., description="List of data sources (file paths or source names)")
-    period: Optional[str] = Field("monthly", pattern="^(daily|weekly|monthly|quarterly)$", description="Report period")
-    template: Optional[str] = Field("default", description="Report template to use")
+    report_type: str = Field(..., pattern="^(sales|financial|performance|custom)$",
+                             description="Type of report to generate")
+    data_sources: List[str] = Field(
+        ..., description="List of data sources (file paths or source names)")
+    period: Optional[str] = Field(
+        "monthly", pattern="^(daily|weekly|monthly|quarterly)$", description="Report period")
+    template: Optional[str] = Field(
+        "default", description="Report template to use")
 
 
 class ClassifyDocumentRequest(BaseModel):
     file_path: str = Field(..., description="Path to document file")
-    content: Optional[str] = Field(None, description="Optional document content if already extracted")
+    content: Optional[str] = Field(
+        None, description="Optional document content if already extracted")
 
 
 class ProcessApprovalRequest(BaseModel):
     workflow_id: str = Field(..., description="Workflow ID")
     approver: str = Field(..., description="Approver name/email")
-    decision: str = Field(..., pattern="^(approved|rejected)$", description="Approval decision")
+    decision: str = Field(..., pattern="^(approved|rejected)$",
+                          description="Approval decision")
     comment: Optional[str] = Field("", description="Optional comment")
+
+
+# Versioning Request/Response Models
+class CreateVersionRequest(BaseModel):
+    file_path: str = Field(..., description="Path to file to version")
+    change_description: Optional[str] = Field(
+        "", description="Description of changes being made")
+    operation_type: Optional[str] = Field(
+        "modify", pattern="^(create|modify|delete|move|copy)$", description="Type of operation")
+    command_id: Optional[str] = Field(
+        None, description="Associated command ID")
+
+
+class RestoreVersionRequest(BaseModel):
+    file_path: str = Field(..., description="Path to file to restore")
+    version_id: str = Field(..., description="Version ID to restore to")
+
+
+class LogCommandRequest(BaseModel):
+    user_input: str = Field(..., description="Original user input")
+    parsed_intent: Dict[str,
+                        Any] = Field(..., description="Parsed intent from NLP")
+    execution_duration: float = Field(...,
+                                      description="Execution time in seconds")
+    success: bool = Field(..., description="Whether command succeeded")
+    error_message: Optional[str] = Field(
+        None, description="Error message if failed")
+    affected_files: Optional[List[str]] = Field(
+        None, description="Files affected by command")
+    before_state: Optional[Dict[str, Any]] = Field(
+        None, description="State before execution")
+    after_state: Optional[Dict[str, Any]] = Field(
+        None, description="State after execution")
+    rollback_data: Optional[Dict[str, Any]] = Field(
+        None, description="Data for rollback operations")
+
+
+class CommandHistoryQuery(BaseModel):
+    limit: Optional[int] = Field(
+        50, description="Maximum number of commands to return")
+    session_id: Optional[str] = Field(None, description="Filter by session ID")
+    success_only: Optional[bool] = Field(
+        None, description="Filter by success status")
+    file_filter: Optional[str] = Field(
+        None, description="Filter by affected file")
+    search_query: Optional[str] = Field(
+        None, description="Search in command text")
+
+
+class ExportHistoryRequest(BaseModel):
+    format_type: str = Field(
+        "json", pattern="^(json|csv|txt)$", description="Export format")
+    session_id: Optional[str] = Field(None, description="Filter by session ID")
+    start_date: Optional[str] = Field(
+        None, description="Start date filter (ISO format)")
+    end_date: Optional[str] = Field(
+        None, description="End date filter (ISO format)")
 
 
 # API Routes
@@ -208,30 +304,371 @@ async def health_check():
     return {"status": "healthy", "version": "1.0.0"}
 
 
+# Versioning and History API Endpoints
+@app.post("/api/aura/initialize", response_model=APIResponse)
+async def initialize_aura_folder():
+    """Initialize .aura folder structure"""
+    try:
+        logger.info("Initializing .aura folder structure via API")
+
+        result = await versioning_service.initialize_aura_folder()
+
+        logger.info("Aura folder structure initialized successfully via API")
+
+        return APIResponse(
+            success=True,
+            message="Aura folder structure initialized successfully",
+            data=result
+        )
+
+    except PermissionError as e:
+        logger.error(
+            "Permission denied initializing .aura folder", error=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Permission denied: {str(e)}"
+        )
+    except Exception as e:
+        logger.error("Failed to initialize .aura folder", error=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to initialize .aura folder: {str(e)}"
+        )
+
+
+@app.post("/api/aura/version/create", response_model=APIResponse)
+async def create_file_version(request: CreateVersionRequest):
+    """Create a version backup of a file"""
+    try:
+        logger.info("Creating file version", file_path=request.file_path,
+                    operation=request.operation_type)
+
+        operation_type = OperationType(request.operation_type)
+
+        result = await versioning_service.create_file_version(
+            file_path=request.file_path,
+            change_description=request.change_description,
+            operation_type=operation_type,
+            command_id=request.command_id
+        )
+
+        logger.info("File version created successfully",
+                    file_path=request.file_path,
+                    version_id=result["version_id"])
+
+        return APIResponse(
+            success=True,
+            message=f"Version created for {request.file_path}",
+            data=result
+        )
+
+    except FileNotFoundError as e:
+        logger.warning("File not found for versioning",
+                       file_path=request.file_path, error=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"File not found: {str(e)}"
+        )
+    except Exception as e:
+        logger.error("Failed to create file version",
+                     file_path=request.file_path, error=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to create file version: {str(e)}"
+        )
+
+
+@app.get("/api/aura/version/list/{file_path:path}", response_model=APIResponse)
+async def get_file_versions(file_path: str):
+    """Get all versions of a specific file"""
+    try:
+        logger.info("Getting file versions", file_path=file_path)
+
+        versions = await versioning_service.get_file_versions(file_path)
+
+        logger.info("File versions retrieved",
+                    file_path=file_path,
+                    version_count=len(versions))
+
+        return APIResponse(
+            success=True,
+            message=f"Found {len(versions)} versions for {file_path}",
+            data={"file_path": file_path, "versions": versions}
+        )
+
+    except Exception as e:
+        logger.error("Failed to get file versions",
+                     file_path=file_path, error=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get file versions: {str(e)}"
+        )
+
+
+@app.post("/api/aura/version/restore", response_model=APIResponse)
+async def restore_file_version(request: RestoreVersionRequest):
+    """Restore a file to a specific version"""
+    try:
+        logger.info("Restoring file version",
+                    file_path=request.file_path,
+                    version_id=request.version_id)
+
+        result = await versioning_service.restore_file_version(
+            file_path=request.file_path,
+            version_id=request.version_id
+        )
+
+        logger.info("File version restored successfully",
+                    file_path=request.file_path,
+                    version_id=request.version_id)
+
+        return APIResponse(
+            success=True,
+            message=f"File restored to version {request.version_id}",
+            data=result
+        )
+
+    except FileNotFoundError as e:
+        logger.warning("Version not found for restore",
+                       file_path=request.file_path,
+                       version_id=request.version_id,
+                       error=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Version not found: {str(e)}"
+        )
+    except Exception as e:
+        logger.error("Failed to restore file version",
+                     file_path=request.file_path,
+                     version_id=request.version_id,
+                     error=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to restore file version: {str(e)}"
+        )
+
+
+@app.post("/api/aura/command/log", response_model=APIResponse)
+async def log_command_execution(request: LogCommandRequest):
+    """Log a command execution to history"""
+    try:
+        logger.info("Logging command execution",
+                    user_input=request.user_input[:50] + "..." if len(
+                        request.user_input) > 50 else request.user_input,
+                    success=request.success)
+
+        command_id = await command_history_service.log_command_execution(
+            user_input=request.user_input,
+            parsed_intent=request.parsed_intent,
+            execution_duration=request.execution_duration,
+            success=request.success,
+            error_message=request.error_message,
+            affected_files=request.affected_files,
+            before_state=request.before_state,
+            after_state=request.after_state,
+            rollback_data=request.rollback_data
+        )
+
+        logger.info("Command execution logged successfully",
+                    command_id=command_id)
+
+        return APIResponse(
+            success=True,
+            message="Command execution logged successfully",
+            data={"command_id": command_id}
+        )
+
+    except Exception as e:
+        logger.error("Failed to log command execution", error=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to log command execution: {str(e)}"
+        )
+
+
+@app.post("/api/aura/command/history", response_model=APIResponse)
+async def get_command_history(request: CommandHistoryQuery):
+    """Get command history with optional filtering"""
+    try:
+        logger.info("Getting command history",
+                    limit=request.limit,
+                    session_id=request.session_id,
+                    search_query=request.search_query)
+
+        if request.search_query:
+            commands = await command_history_service.search_command_history(
+                query=request.search_query,
+                limit=request.limit
+            )
+        else:
+            commands = await command_history_service.get_command_history(
+                limit=request.limit,
+                session_id=request.session_id,
+                success_only=request.success_only,
+                file_filter=request.file_filter
+            )
+
+        logger.info("Command history retrieved", command_count=len(commands))
+
+        return APIResponse(
+            success=True,
+            message=f"Retrieved {len(commands)} command history entries",
+            data={"commands": commands, "total_count": len(commands)}
+        )
+
+    except Exception as e:
+        logger.error("Failed to get command history", error=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get command history: {str(e)}"
+        )
+
+
+@app.get("/api/aura/command/{command_id}", response_model=APIResponse)
+async def get_command_details(command_id: str):
+    """Get detailed information about a specific command"""
+    try:
+        logger.info("Getting command details", command_id=command_id)
+
+        command_details = await command_history_service.get_command_details(command_id)
+
+        if not command_details:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Command not found: {command_id}"
+            )
+
+        logger.info("Command details retrieved", command_id=command_id)
+
+        return APIResponse(
+            success=True,
+            message="Command details retrieved successfully",
+            data=command_details
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Failed to get command details",
+                     command_id=command_id, error=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get command details: {str(e)}"
+        )
+
+
+@app.get("/api/aura/session/summary", response_model=APIResponse)
+async def get_session_summary(session_id: Optional[str] = None):
+    """Get summary statistics for a session"""
+    try:
+        logger.info("Getting session summary", session_id=session_id)
+
+        summary = await command_history_service.get_session_summary(session_id)
+
+        logger.info("Session summary retrieved",
+                    session_id=summary["session_id"],
+                    total_commands=summary["total_commands"])
+
+        return APIResponse(
+            success=True,
+            message="Session summary retrieved successfully",
+            data=summary
+        )
+
+    except Exception as e:
+        logger.error("Failed to get session summary",
+                     session_id=session_id, error=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get session summary: {str(e)}"
+        )
+
+
+@app.post("/api/aura/history/export", response_model=APIResponse)
+async def export_command_history(request: ExportHistoryRequest):
+    """Export command history in specified format"""
+    try:
+        logger.info("Exporting command history",
+                    format=request.format_type,
+                    session_id=request.session_id)
+
+        result = await command_history_service.export_command_history(
+            format_type=request.format_type,
+            session_id=request.session_id,
+            start_date=request.start_date,
+            end_date=request.end_date
+        )
+
+        logger.info("Command history exported successfully",
+                    export_path=result["export_path"],
+                    total_commands=result["total_commands"])
+
+        return APIResponse(
+            success=True,
+            message=f"Command history exported to {result['export_path']}",
+            data=result
+        )
+
+    except Exception as e:
+        logger.error("Failed to export command history", error=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to export command history: {str(e)}"
+        )
+
+
+@app.get("/api/aura/storage/stats", response_model=APIResponse)
+async def get_storage_stats():
+    """Get storage statistics for .aura folder"""
+    try:
+        logger.info("Getting storage statistics")
+
+        stats = await versioning_service.get_storage_stats()
+
+        logger.info("Storage statistics retrieved",
+                    total_size_mb=stats.get("total_size_mb", 0),
+                    version_count=stats.get("version_count", 0))
+
+        return APIResponse(
+            success=True,
+            message="Storage statistics retrieved successfully",
+            data=stats
+        )
+
+    except Exception as e:
+        logger.error("Failed to get storage statistics", error=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get storage statistics: {str(e)}"
+        )
+
+
 @app.post("/api/create-file", response_model=APIResponse)
-@app.post("/create_file", response_model=APIResponse)  # Keep backward compatibility
+# Keep backward compatibility
+@app.post("/create_file", response_model=APIResponse)
 async def create_file(request: CreateFileRequest):
     """Create a new file with optional content"""
     try:
-        logger.info("Creating file", title=request.title, path=request.path, 
-                   content_length=len(request.content or ""))
-        
+        logger.info("Creating file", title=request.title, path=request.path,
+                    content_length=len(request.content or ""))
+
         result = await file_service.create_file(
             title=request.title,
             path=request.path,
             content=request.content
         )
-        
+
         logger.info("File created successfully", file_path=result["file_path"])
-        
+
         return APIResponse(
             success=True,
             message=f"File '{request.title}' created successfully",
             data=result
         )
-        
+
     except FileExistsError as e:
-        logger.warning("File already exists", title=request.title, error=str(e))
+        logger.warning("File already exists",
+                       title=request.title, error=str(e))
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"File already exists: {str(e)}"
@@ -243,7 +680,8 @@ async def create_file(request: CreateFileRequest):
             detail=f"Permission denied: {str(e)}"
         )
     except Exception as e:
-        logger.error("Failed to create file", title=request.title, error=str(e))
+        logger.error("Failed to create file",
+                     title=request.title, error=str(e))
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to create file: {str(e)}"
@@ -251,26 +689,27 @@ async def create_file(request: CreateFileRequest):
 
 
 @app.post("/api/open-item", response_model=APIResponse)
-@app.post("/open_item", response_model=APIResponse)  # Keep backward compatibility
+# Keep backward compatibility
+@app.post("/open_item", response_model=APIResponse)
 async def open_item(request: OpenItemRequest):
     """Open a file, application, or folder"""
     try:
         logger.info("Opening item", query=request.query, type=request.type)
-        
+
         result = await file_service.open_item(
             query=request.query,
             item_type=request.type
         )
-        
-        logger.info("Item opened successfully", query=request.query, 
-                   found_path=result.get("path"))
-        
+
+        logger.info("Item opened successfully", query=request.query,
+                    found_path=result.get("path"))
+
         return APIResponse(
             success=True,
             message=f"Opened '{request.query}' successfully",
             data=result
         )
-        
+
     except FileNotFoundError as e:
         logger.warning("Item not found", query=request.query, error=str(e))
         raise HTTPException(
@@ -286,24 +725,25 @@ async def open_item(request: OpenItemRequest):
 
 
 @app.post("/api/analyze-sheet", response_model=SpreadsheetAnalysisResponse)
-@app.post("/analyze_sheet", response_model=SpreadsheetAnalysisResponse)  # Keep backward compatibility
+# Keep backward compatibility
+@app.post("/analyze_sheet", response_model=SpreadsheetAnalysisResponse)
 async def analyze_spreadsheet(request: AnalyzeSheetRequest):
     """Analyze spreadsheet data with specified operation"""
     try:
-        logger.info("Analyzing spreadsheet", path=request.path, 
-                   operation=request.op, column=request.column)
-        
+        logger.info("Analyzing spreadsheet", path=request.path,
+                    operation=request.op, column=request.column)
+
         result = await spreadsheet_service.analyze(
             path=request.path,
             operation=request.op,
             column=request.column
         )
-        
-        logger.info("Spreadsheet analysis completed", 
-                   result=result["result"], 
-                   matched_column=result["matched_column"],
-                   cells_count=result["cells_count"])
-        
+
+        logger.info("Spreadsheet analysis completed",
+                    result=result["result"],
+                    matched_column=result["matched_column"],
+                    cells_count=result["cells_count"])
+
         return SpreadsheetAnalysisResponse(
             success=True,
             result=result["result"],
@@ -312,22 +752,24 @@ async def analyze_spreadsheet(request: AnalyzeSheetRequest):
             operation=request.op,
             message=f"Analysis completed: {request.op} of '{result['matched_column']}' = {result['result']}"
         )
-        
+
     except FileNotFoundError as e:
-        logger.warning("Spreadsheet file not found", path=request.path, error=str(e))
+        logger.warning("Spreadsheet file not found",
+                       path=request.path, error=str(e))
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Spreadsheet file not found: {str(e)}"
         )
     except ValueError as e:
-        logger.warning("Invalid spreadsheet operation", path=request.path, 
-                      column=request.column, error=str(e))
+        logger.warning("Invalid spreadsheet operation", path=request.path,
+                       column=request.column, error=str(e))
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Invalid operation: {str(e)}"
         )
     except Exception as e:
-        logger.error("Failed to analyze spreadsheet", path=request.path, error=str(e))
+        logger.error("Failed to analyze spreadsheet",
+                     path=request.path, error=str(e))
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to analyze spreadsheet: {str(e)}"
@@ -338,18 +780,19 @@ async def analyze_spreadsheet(request: AnalyzeSheetRequest):
 async def summarize_document(request: SummarizeDocRequest):
     """Summarize a PDF document"""
     try:
-        logger.info("Summarizing document", path=request.path, length=request.length)
-        
+        logger.info("Summarizing document",
+                    path=request.path, length=request.length)
+
         result = await document_service.summarize(
             path=request.path,
             length_type=request.length
         )
-        
-        logger.info("Document summarization completed", 
-                   path=request.path,
-                   summary_length=len(result["summary"]),
-                   word_count=result["word_count"])
-        
+
+        logger.info("Document summarization completed",
+                    path=request.path,
+                    summary_length=len(result["summary"]),
+                    word_count=result["word_count"])
+
         return DocumentSummaryResponse(
             success=True,
             summary=result["summary"],
@@ -357,7 +800,7 @@ async def summarize_document(request: SummarizeDocRequest):
             word_count=result["word_count"],
             message=f"Document summarized successfully ({result['word_count']} words)"
         )
-        
+
     except FileNotFoundError as e:
         logger.warning("PDF file not found", path=request.path, error=str(e))
         raise HTTPException(
@@ -365,7 +808,8 @@ async def summarize_document(request: SummarizeDocRequest):
             detail=f"PDF file not found: {str(e)}"
         )
     except Exception as e:
-        logger.error("Failed to summarize document", path=request.path, error=str(e))
+        logger.error("Failed to summarize document",
+                     path=request.path, error=str(e))
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to summarize document: {str(e)}"
@@ -373,12 +817,14 @@ async def summarize_document(request: SummarizeDocRequest):
 
 
 @app.post("/api/update-sheet", response_model=APIResponse)
-@app.post("/update_sheet", response_model=APIResponse)  # Keep backward compatibility
+# Keep backward compatibility
+@app.post("/update_sheet", response_model=APIResponse)
 async def update_spreadsheet(request: UpdateSheetRequest):
     """Update spreadsheet with various operations"""
     try:
-        logger.info("Updating spreadsheet", path=request.path, operation=request.operation)
-        
+        logger.info("Updating spreadsheet", path=request.path,
+                    operation=request.operation)
+
         result = await spreadsheet_service.update_spreadsheet(
             path=request.path,
             operation=request.operation,
@@ -386,32 +832,35 @@ async def update_spreadsheet(request: UpdateSheetRequest):
             value=request.value,
             percentage=request.percentage
         )
-        
-        logger.info("Spreadsheet updated successfully", 
-                   path=request.path,
-                   operation=request.operation,
-                   output_file=result.get("output_file"))
-        
+
+        logger.info("Spreadsheet updated successfully",
+                    path=request.path,
+                    operation=request.operation,
+                    output_file=result.get("output_file"))
+
         return APIResponse(
             success=True,
             message=f"Spreadsheet updated successfully with {request.operation}",
             data=result
         )
-        
+
     except FileNotFoundError as e:
-        logger.warning("Spreadsheet file not found", path=request.path, error=str(e))
+        logger.warning("Spreadsheet file not found",
+                       path=request.path, error=str(e))
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Spreadsheet file not found: {str(e)}"
         )
     except ValueError as e:
-        logger.warning("Invalid spreadsheet update operation", path=request.path, error=str(e))
+        logger.warning("Invalid spreadsheet update operation",
+                       path=request.path, error=str(e))
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Invalid operation: {str(e)}"
         )
     except Exception as e:
-        logger.error("Failed to update spreadsheet", path=request.path, error=str(e))
+        logger.error("Failed to update spreadsheet",
+                     path=request.path, error=str(e))
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to update spreadsheet: {str(e)}"
@@ -422,13 +871,14 @@ async def update_spreadsheet(request: UpdateSheetRequest):
 async def extract_document_data(request: ExtractDataRequest):
     """Extract structured data from documents using OCR"""
     try:
-        logger.info("Extracting document data", file_path=request.file_path, document_type=request.document_type)
-        
+        logger.info("Extracting document data", file_path=request.file_path,
+                    document_type=request.document_type)
+
         result = await ocr_service.extract_data_from_document(
             file_path=request.file_path,
             document_type=request.document_type
         )
-        
+
         # If destination file specified, transfer data
         if request.destination_file:
             transfer_result = await ocr_service.transfer_data_to_spreadsheet(
@@ -436,26 +886,28 @@ async def extract_document_data(request: ExtractDataRequest):
                 destination_file=request.destination_file
             )
             result["transfer_result"] = transfer_result
-        
-        logger.info("Document data extraction completed", 
-                   file_path=request.file_path,
-                   document_type=result["document_type"],
-                   confidence=result["confidence"])
-        
+
+        logger.info("Document data extraction completed",
+                    file_path=request.file_path,
+                    document_type=result["document_type"],
+                    confidence=result["confidence"])
+
         return APIResponse(
             success=True,
             message=f"Data extracted from {result['document_type']} with {result['confidence']:.1%} confidence",
             data=result
         )
-        
+
     except FileNotFoundError as e:
-        logger.warning("Document file not found", file_path=request.file_path, error=str(e))
+        logger.warning("Document file not found",
+                       file_path=request.file_path, error=str(e))
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Document file not found: {str(e)}"
         )
     except Exception as e:
-        logger.error("Failed to extract document data", file_path=request.file_path, error=str(e))
+        logger.error("Failed to extract document data",
+                     file_path=request.file_path, error=str(e))
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to extract document data: {str(e)}"
@@ -466,25 +918,27 @@ async def extract_document_data(request: ExtractDataRequest):
 async def create_email_rule(request: EmailRuleRequest):
     """Create email automation rule"""
     try:
-        logger.info("Creating email rule", rule_name=request.name, action=request.action)
-        
+        logger.info("Creating email rule",
+                    rule_name=request.name, action=request.action)
+
         result = await email_service.create_email_rule({
             "name": request.name,
             "condition": request.condition,
             "action": request.action,
             "target": request.target
         })
-        
+
         logger.info("Email rule created successfully", rule_name=request.name)
-        
+
         return APIResponse(
             success=True,
             message=f"Email rule '{request.name}' created successfully",
             data=result
         )
-        
+
     except Exception as e:
-        logger.error("Failed to create email rule", rule_name=request.name, error=str(e))
+        logger.error("Failed to create email rule",
+                     rule_name=request.name, error=str(e))
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to create email rule: {str(e)}"
@@ -496,19 +950,19 @@ async def sort_emails():
     """Sort emails using automation rules"""
     try:
         logger.info("Sorting emails using automation rules")
-        
+
         result = await email_service.sort_emails_by_rules()
-        
-        logger.info("Email sorting completed", 
-                   total_emails=result["total_emails"],
-                   sorted_emails=result["sorted_emails"])
-        
+
+        logger.info("Email sorting completed",
+                    total_emails=result["total_emails"],
+                    sorted_emails=result["sorted_emails"])
+
         return APIResponse(
             success=True,
             message=f"Sorted {result['sorted_emails']} out of {result['total_emails']} emails",
             data=result
         )
-        
+
     except Exception as e:
         logger.error("Failed to sort emails", error=str(e))
         raise HTTPException(
@@ -521,25 +975,26 @@ async def sort_emails():
 async def schedule_meeting(request: ScheduleMeetingRequest):
     """Find available slots and schedule meeting"""
     try:
-        logger.info("Scheduling meeting", participants=len(request.participants), duration=request.duration)
-        
+        logger.info("Scheduling meeting", participants=len(
+            request.participants), duration=request.duration)
+
         # First find available slots
         slots_result = await calendar_service.find_available_slots(
             participants=request.participants,
             duration=request.duration,
             timeframe=request.timeframe
         )
-        
+
         if not slots_result["available_slots"]:
             return APIResponse(
                 success=False,
                 message="No available slots found for all participants",
                 data=slots_result
             )
-        
+
         # Use the best available slot
         best_slot = slots_result["available_slots"][0]
-        
+
         # Schedule the meeting
         meeting_result = await calendar_service.schedule_meeting({
             "title": request.title,
@@ -548,20 +1003,21 @@ async def schedule_meeting(request: ScheduleMeetingRequest):
             "end_time": best_slot["end"].isoformat(),
             "agenda": request.agenda
         })
-        
-        logger.info("Meeting scheduled successfully", 
-                   meeting_id=meeting_result["meeting_id"],
-                   participants=len(request.participants))
-        
+
+        logger.info("Meeting scheduled successfully",
+                    meeting_id=meeting_result["meeting_id"],
+                    participants=len(request.participants))
+
         return APIResponse(
             success=True,
             message=f"Meeting scheduled for {best_slot['formatted_time']} on {best_slot['day_of_week']}",
             data={
                 "meeting_details": meeting_result,
-                "available_slots": slots_result["available_slots"][:5]  # Show top 5 alternatives
+                # Show top 5 alternatives
+                "available_slots": slots_result["available_slots"][:5]
             }
         )
-        
+
     except Exception as e:
         logger.error("Failed to schedule meeting", error=str(e))
         raise HTTPException(
@@ -575,18 +1031,18 @@ async def track_follow_ups():
     """Track emails requiring follow-up"""
     try:
         logger.info("Tracking email follow-ups")
-        
+
         result = await email_service.track_follow_ups()
-        
-        logger.info("Follow-up tracking completed", 
-                   follow_ups_needed=result["follow_ups_needed"])
-        
+
+        logger.info("Follow-up tracking completed",
+                    follow_ups_needed=result["follow_ups_needed"])
+
         return APIResponse(
             success=True,
             message=f"Found {result['follow_ups_needed']} emails needing follow-up",
             data=result
         )
-        
+
     except Exception as e:
         logger.error("Failed to track follow-ups", error=str(e))
         raise HTTPException(
@@ -599,29 +1055,31 @@ async def track_follow_ups():
 async def generate_report(request: GenerateReportRequest):
     """Generate automated report from data sources"""
     try:
-        logger.info("Generating report", report_type=request.report_type, data_sources=len(request.data_sources))
-        
+        logger.info("Generating report", report_type=request.report_type,
+                    data_sources=len(request.data_sources))
+
         report_config = {
             "type": request.report_type,
             "data_sources": request.data_sources,
             "period": request.period,
             "template": request.template
         }
-        
+
         result = await report_service.generate_report(report_config)
-        
-        logger.info("Report generated successfully", 
-                   report_id=result["report_id"],
-                   report_type=request.report_type)
-        
+
+        logger.info("Report generated successfully",
+                    report_id=result["report_id"],
+                    report_type=request.report_type)
+
         return APIResponse(
             success=True,
             message=f"{request.report_type.title()} report generated successfully",
             data=result
         )
-        
+
     except Exception as e:
-        logger.error("Report generation failed", report_type=request.report_type, error=str(e))
+        logger.error("Report generation failed",
+                     report_type=request.report_type, error=str(e))
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Report generation failed: {str(e)}"
@@ -633,31 +1091,33 @@ async def classify_document(request: ClassifyDocumentRequest):
     """Classify document and determine workflow"""
     try:
         logger.info("Classifying document", file_path=request.file_path)
-        
+
         result = await workflow_service.classify_document(
             file_path=request.file_path,
             content=request.content
         )
-        
-        logger.info("Document classified successfully", 
-                   file_path=request.file_path,
-                   document_type=result["document_type"],
-                   priority=result["priority"])
-        
+
+        logger.info("Document classified successfully",
+                    file_path=request.file_path,
+                    document_type=result["document_type"],
+                    priority=result["priority"])
+
         return APIResponse(
             success=True,
             message=f"Document classified as {result['document_type']} with {result['priority']} priority",
             data=result
         )
-        
+
     except FileNotFoundError as e:
-        logger.warning("Document file not found", file_path=request.file_path, error=str(e))
+        logger.warning("Document file not found",
+                       file_path=request.file_path, error=str(e))
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Document file not found: {str(e)}"
         )
     except Exception as e:
-        logger.error("Document classification failed", file_path=request.file_path, error=str(e))
+        logger.error("Document classification failed",
+                     file_path=request.file_path, error=str(e))
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Document classification failed: {str(e)}"
@@ -669,23 +1129,23 @@ async def start_workflow(request: ClassifyDocumentRequest):
     """Start workflow process for document"""
     try:
         logger.info("Starting workflow", file_path=request.file_path)
-        
+
         # First classify the document
         classification_result = await workflow_service.classify_document(
             file_path=request.file_path,
             content=request.content
         )
-        
+
         # Start workflow based on classification
         workflow_result = await workflow_service.start_workflow(
             document_info=classification_result,
             workflow_config=classification_result["workflow_config"]
         )
-        
-        logger.info("Workflow started successfully", 
-                   workflow_id=workflow_result["workflow_id"],
-                   status=workflow_result["status"])
-        
+
+        logger.info("Workflow started successfully",
+                    workflow_id=workflow_result["workflow_id"],
+                    status=workflow_result["status"])
+
         return APIResponse(
             success=True,
             message=f"Workflow started for {classification_result['document_type']}",
@@ -694,9 +1154,10 @@ async def start_workflow(request: ClassifyDocumentRequest):
                 "workflow": workflow_result
             }
         )
-        
+
     except Exception as e:
-        logger.error("Workflow start failed", file_path=request.file_path, error=str(e))
+        logger.error("Workflow start failed",
+                     file_path=request.file_path, error=str(e))
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Workflow start failed: {str(e)}"
@@ -707,34 +1168,37 @@ async def start_workflow(request: ClassifyDocumentRequest):
 async def process_approval(request: ProcessApprovalRequest):
     """Process approval decision for workflow"""
     try:
-        logger.info("Processing approval", workflow_id=request.workflow_id, decision=request.decision)
-        
+        logger.info("Processing approval",
+                    workflow_id=request.workflow_id, decision=request.decision)
+
         result = await workflow_service.process_approval(
             workflow_id=request.workflow_id,
             approver=request.approver,
             decision=request.decision,
             comment=request.comment
         )
-        
-        logger.info("Approval processed successfully", 
-                   workflow_id=request.workflow_id,
-                   decision=request.decision,
-                   new_status=result["new_status"])
-        
+
+        logger.info("Approval processed successfully",
+                    workflow_id=request.workflow_id,
+                    decision=request.decision,
+                    new_status=result["new_status"])
+
         return APIResponse(
             success=True,
             message=f"Approval {request.decision} processed successfully",
             data=result
         )
-        
+
     except ValueError as e:
-        logger.warning("Invalid approval request", workflow_id=request.workflow_id, error=str(e))
+        logger.warning("Invalid approval request",
+                       workflow_id=request.workflow_id, error=str(e))
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Invalid approval request: {str(e)}"
         )
     except Exception as e:
-        logger.error("Approval processing failed", workflow_id=request.workflow_id, error=str(e))
+        logger.error("Approval processing failed",
+                     workflow_id=request.workflow_id, error=str(e))
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Approval processing failed: {str(e)}"
@@ -746,23 +1210,25 @@ async def get_workflow_status(workflow_id: str):
     """Get current status of workflow"""
     try:
         logger.info("Getting workflow status", workflow_id=workflow_id)
-        
+
         result = await workflow_service.get_workflow_status(workflow_id)
-        
+
         return APIResponse(
             success=True,
             message=f"Workflow status retrieved",
             data=result
         )
-        
+
     except ValueError as e:
-        logger.warning("Workflow not found", workflow_id=workflow_id, error=str(e))
+        logger.warning("Workflow not found",
+                       workflow_id=workflow_id, error=str(e))
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Workflow not found: {str(e)}"
         )
     except Exception as e:
-        logger.error("Failed to get workflow status", workflow_id=workflow_id, error=str(e))
+        logger.error("Failed to get workflow status",
+                     workflow_id=workflow_id, error=str(e))
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to get workflow status: {str(e)}"
@@ -774,17 +1240,18 @@ async def get_pending_approvals(approver: str):
     """Get pending approvals for an approver"""
     try:
         logger.info("Getting pending approvals", approver=approver)
-        
+
         result = await workflow_service.get_pending_approvals(approver)
-        
+
         return APIResponse(
             success=True,
             message=f"Found {result['pending_count']} pending approvals",
             data=result
         )
-        
+
     except Exception as e:
-        logger.error("Failed to get pending approvals", approver=approver, error=str(e))
+        logger.error("Failed to get pending approvals",
+                     approver=approver, error=str(e))
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to get pending approvals: {str(e)}"
@@ -794,11 +1261,11 @@ async def get_pending_approvals(approver: str):
 # Global exception handler
 @app.exception_handler(Exception)
 async def global_exception_handler(request, exc):
-    logger.error("Unhandled exception", 
-                path=request.url.path,
-                method=request.method,
-                error=str(exc))
-    
+    logger.error("Unhandled exception",
+                 path=request.url.path,
+                 method=request.method,
+                 error=str(exc))
+
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content={

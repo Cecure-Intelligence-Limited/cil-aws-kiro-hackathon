@@ -1,0 +1,27 @@
+{
+  "session_id": "session_20250915_225331_0446c713",
+  "start_time": "2025-09-15T22:53:31.317149+00:00",
+  "commands": [
+    {
+      "id": "cmd_20250915_225331_315151",
+      "timestamp": "2025-09-15T22:53:31.315151+00:00",
+      "session_id": "session_20250915_225331_0446c713",
+      "user_input": "create test_file.txt",
+      "parsed_intent": {
+        "action": "create_file",
+        "filename": "test_file.txt"
+      },
+      "execution_duration": 1.5,
+      "success": true,
+      "error_message": [
+        "test_file.txt"
+      ],
+      "affected_files": [],
+      "before_state": {},
+      "after_state": {},
+      "rollback_data": null
+    }
+  ],
+  "last_updated": "2025-09-15T22:53:31.317149+00:00",
+  "total_commands": 1
+}

@@ -87,6 +87,7 @@ src-tauri/target/
 # Backend data files
 backend/data/
 backend/logs/
+backend/Lib/*
 
 # Temporary files
 *.tmp

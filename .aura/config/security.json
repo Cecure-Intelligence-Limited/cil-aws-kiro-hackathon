@@ -1,0 +1,5 @@
+{
+  "folder_permissions": "owner_only",
+  "audit_logging": true,
+  "secure_deletion": true
+}

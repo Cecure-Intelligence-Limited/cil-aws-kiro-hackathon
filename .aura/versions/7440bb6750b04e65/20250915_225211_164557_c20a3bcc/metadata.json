@@ -1,0 +1,16 @@
+{
+  "id": "20250915_225211_164557_c20a3bcc",
+  "file_path": "test_file.txt",
+  "timestamp": "2025-09-15T22:52:11.164557+00:00",
+  "size": 45,
+  "checksum": "e7d2d71f057851d3ad7b74c2def17f159a60f5ac014618798eabddd199c1eac6",
+  "change_description": "Initial version",
+  "operation_type": "create",
+  "command_id": "cmd_20250915_225211_176707",
+  "metadata": {
+    "original_size": 45,
+    "compression_ratio": 1.0,
+    "is_differential": false,
+    "parent_version": null
+  }
+}
